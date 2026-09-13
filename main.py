@@ -15,7 +15,6 @@ async def get_roblox_thumbnail(user_id: int):
                 data = await resp.json()
                 results = data.get("data", [])
                 if results:
-                    # state가 Completed일 때만 정확한 imageUrl 반환
                     item = results[0]
                     if item.get("state") == "Completed":
                         return item.get("imageUrl")
@@ -85,7 +84,7 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
                 title="✨ 로블록스 연동 플레이어 등록",
                 color=discord.Color.from_rgb(0, 162, 255)
             )
-            embed.add_field(name="📌 디스코드 유저", value=f"{member.mention} (`{member}`)", inline=False)
+            embed.add_field(name="📌 디스코드 유저", value=f"**{member.display_name}** (`@{member.name}`)", inline=False)
             embed.add_field(name="🏷️ 로블록스 닉네임", value=f"**{roblox_display}**", inline=True)
             embed.add_field(name="🆔 로블록스 아이디", value=f"`@{roblox_name}`", inline=True)
             embed.add_field(name="🔢 로블록스 숫자 ID", value=f"`{roblox_id}`", inline=False)
@@ -129,7 +128,7 @@ async def on_ready():
 
 @bot.tree.command(name="인증판넬설정", description="인증-탭에 로블록스 인증 버튼을 설치합니다.")
 @app_commands.default_permissions(administrator=True)
-async def setup_verify_panel(interaction: discord.Interaction):
+async def setup_verify_panel(interaction: discord.Interaction): # <--- 올바르게 수정 완료!
     embed = discord.Embed(
         title="🎮 로블록스 계정 인증 안내",
         description="아래 **[로블록스 인증하기]** 버튼을 눌러 본인의 로블록스 **아이디**를 입력해 주세요.\n정상 확인되면 자동으로 **Verified** 역할과 프로필이 등록됩니다.",
