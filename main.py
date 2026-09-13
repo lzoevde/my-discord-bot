@@ -1,9 +1,89 @@
 import os
+import aiohttp
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+async def check_roblox_user(username: str):
+    url = "https://users.roblox.com/v1/usernames/users"
+    payload = {"usernames": [username], "excludeBannedUsers": True}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                users = data.get("data", [])
+                if users:
+                    return users[0]
+    return None
+
+class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
+    roblox_username = discord.ui.TextInput(
+        label="로블록스 닉네임을 입력하세요",
+        placeholder="예: Builderman",
+        max_length=50,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        username = self.roblox_username.value.strip()
+
+        r_user = await check_roblox_user(username)
+        if not r_user:
+            return await interaction.followup.send(
+                f"❌ **'{username}'**은(는) 존재하지 않는 로블록스 계정이거나 밴된 계정입니다. 정확한 닉네임을 입력해주세요.",
+                ephemeral=True
+            )
+
+        guild = interaction.guild
+        member = interaction.user
+        roblox_id = r_user["id"]
+        roblox_display = r_user["displayName"]
+        roblox_name = r_user["name"]
+
+        role = discord.utils.get(guild.roles, name="Verified")
+        if not role:
+            return await interaction.followup.send(
+                "❌ 서버에 **'Verified'** 이름의 역할이 없습니다. 서버 설정 -> 역할에서 'Verified' 역할을 먼저 만들어주세요!",
+                ephemeral=True
+            )
+
+        try:
+            await member.add_roles(role)
+        except discord.Forbidden:
+            return await interaction.followup.send(
+                "❌ 봇의 권한이 부족합니다. 봇 역할을 'Verified' 역할보다 위쪽으로 올려주세요.",
+                ephemeral=True
+            )
+
+        target_channel = discord.utils.get(guild.text_channels, name="한국인-플레이어")
+        if target_channel:
+            embed = discord.Embed(
+                title="✅ 신규 플레이어 인증 완료",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="디스코드 유저", value=member.mention, inline=True)
+            embed.add_field(name="로블록스 닉네임", value=f"**{roblox_name}** ({roblox_display})", inline=True)
+            embed.add_field(name="로블록스 ID", value=str(roblox_id), inline=False)
+            embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={roblox_id}&width=420&height=420&format=png")
+            embed.timestamp = discord.utils.utcnow()
+            await target_channel.send(embed=embed)
+
+        await interaction.followup.send(
+            f"✅ 인증이 완료되었습니다! **Verified** 역할을 지급받으셨습니다.",
+            ephemeral=True
+        )
+
+class VerificationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="로블록스 인증하기", style=discord.ButtonStyle.green, custom_id="verify_button_persistent")
+    async def verify_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(VerificationModal())
 
 @bot.event
 async def on_ready():
@@ -12,15 +92,25 @@ async def on_ready():
     print(f"🚀 디스코드 봇이 정상적으로 가동되었습니다.")
     print(f"========================================")
     
+    bot.add_view(VerificationView())
+    
     try:
         synced = await bot.tree.sync()
         print(f"✅ 슬래시 명령어 총 {len(synced)}개 동기화 완료")
     except Exception as e:
         print(f"❌ 명령어 동기화 실패: {e}")
 
-@bot.tree.command(name="안녕", description="봇이 인사를 건넵니다.")
-async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message(f"안녕하세요 {interaction.user.mention}님! 봇이 정상 작동 중입니다 👋", ephemeral=True)
+@bot.tree.command(name="인증판넬설정", description="인증-탭에 로블록스 인증 버튼을 설치합니다.")
+@app_commands.default_permissions(administrator=True)
+async def setup_verify_panel(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🎮 로블록스 계정 인증 안내",
+        description="아래 **[로블록스 인증하기]** 버튼을 눌러 본인의 로블록스 닉네임을 입력해 주세요.\n정상 확인되면 자동으로 **Verified** 역할과 프로필이 등록됩니다.",
+        color=discord.Color.blue()
+    )
+    # [수정됨] 응답을 먼저 보내서 명령어가 씹히지 않게 처리
+    await interaction.response.send_message("✅ 인증 패널을 설치했습니다!", ephemeral=True)
+    await interaction.channel.send(embed=embed, view=VerificationView())
 
 if __name__ == "__main__":
     TOKEN = os.getenv("TOKEN")
