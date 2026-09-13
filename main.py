@@ -21,7 +21,7 @@ async def check_roblox_user(username: str):
 
 class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
     roblox_username = discord.ui.TextInput(
-        label="로블록스 닉네임을 입력하세요",
+        label="로블록스 아이디를 입력하세요",
         placeholder="예: Builderman",
         max_length=50,
         required=True
@@ -34,7 +34,7 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
         r_user = await check_roblox_user(username)
         if not r_user:
             return await interaction.followup.send(
-                f"❌ **'{username}'**은(는) 존재하지 않는 로블록스 계정이거나 밴된 계정입니다. 정확한 닉네임을 입력해주세요.",
+                f"❌ **'{username}'**은(는) 존재하지 않는 로블록스 계정이거나 밴된 계정입니다. 정확한 아이디를 입력해주세요.",
                 ephemeral=True
             )
 
@@ -59,17 +59,23 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
                 ephemeral=True
             )
 
+        # '#한국인-플레이어' 채널에 보기 좋은 프로필 전송
         target_channel = discord.utils.get(guild.text_channels, name="한국인-플레이어")
         if target_channel:
             embed = discord.Embed(
-                title="✅ 신규 플레이어 인증 완료",
-                color=discord.Color.green()
+                title="✨ 로블록스 연동 플레이어 등록",
+                color=discord.Color.from_rgb(0, 162, 255) # 파란 계열 포인트 컬러
             )
-            embed.add_field(name="디스코드 유저", value=member.mention, inline=True)
-            embed.add_field(name="로블록스 닉네임", value=f"**{roblox_name}** ({roblox_display})", inline=True)
-            embed.add_field(name="로블록스 ID", value=str(roblox_id), inline=False)
+            embed.add_field(name="📌 디스코드 유저", value=f"{member.mention} (`{member}`)", inline=False)
+            embed.add_field(name="🏷️ 로블록스 닉네임", value=f"**{roblox_display}**", inline=True)
+            embed.add_field(name="🆔 로블록스 아이디", value=f"`@{roblox_name}`", inline=True)
+            embed.add_field(name="🔢 로블록스 숫자 ID", value=f"`{roblox_id}`", inline=False)
+            
+            # 아바타 렌즈 이미지 크게 설정
             embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={roblox_id}&width=420&height=420&format=png")
+            embed.set_footer(text="Roblox Verification System", icon_url=guild.icon.url if guild.icon else None)
             embed.timestamp = discord.utils.utcnow()
+            
             await target_channel.send(embed=embed)
 
         await interaction.followup.send(
@@ -105,10 +111,9 @@ async def on_ready():
 async def setup_verify_panel(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎮 로블록스 계정 인증 안내",
-        description="아래 **[로블록스 인증하기]** 버튼을 눌러 본인의 로블록스 닉네임을 입력해 주세요.\n정상 확인되면 자동으로 **Verified** 역할과 프로필이 등록됩니다.",
+        description="아래 **[로블록스 인증하기]** 버튼을 눌러 본인의 로블록스 **아이디**를 입력해 주세요.\n정상 확인되면 자동으로 **Verified** 역할과 프로필이 등록됩니다.",
         color=discord.Color.blue()
     )
-    # [수정됨] 응답을 먼저 보내서 명령어가 씹히지 않게 처리
     await interaction.response.send_message("✅ 인증 패널을 설치했습니다!", ephemeral=True)
     await interaction.channel.send(embed=embed, view=VerificationView())
 
@@ -119,5 +124,5 @@ if __name__ == "__main__":
     else:
         try:
             bot.run(TOKEN)
-        except Exception as e:
+        except Exception as e: # <--- 'e' 추가됨!
             print(f"❌ 봇 실행 중 오류 발생: {e}")
