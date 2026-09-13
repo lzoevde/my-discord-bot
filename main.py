@@ -84,7 +84,8 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
                 title="✨ 로블록스 연동 플레이어 등록",
                 color=discord.Color.from_rgb(0, 162, 255)
             )
-            embed.add_field(name="📌 디스코드 유저", value=f"**{member.display_name}** (`@{member.name}`)", inline=False)
+            # 임베드 필드에서는 멘션 대신 아이디 텍스트로 깔끔하게 표시
+            embed.add_field(name="📌 디스코드 유저", value=f"`@{member.name}` ({member.display_name})", inline=False)
             embed.add_field(name="🏷️ 로블록스 닉네임", value=f"**{roblox_display}**", inline=True)
             embed.add_field(name="🆔 로블록스 아이디", value=f"`@{roblox_name}`", inline=True)
             embed.add_field(name="🔢 로블록스 숫자 ID", value=f"`{roblox_id}`", inline=False)
@@ -96,7 +97,8 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
             embed.set_footer(text="Roblox Verification System", icon_url=icon_url)
             embed.timestamp = discord.utils.utcnow()
             
-            await target_channel.send(embed=embed)
+            # content=f"{member.mention}"을 추가해서 멘션이 진짜 작동하게 수정!
+            await target_channel.send(content=f"{member.mention}", embed=embed)
 
         await interaction.followup.send(
             f"✅ 인증이 완료되었습니다! **Verified** 역할을 지급받으셨습니다.",
@@ -128,7 +130,7 @@ async def on_ready():
 
 @bot.tree.command(name="인증판넬설정", description="인증-탭에 로블록스 인증 버튼을 설치합니다.")
 @app_commands.default_permissions(administrator=True)
-async def setup_verify_panel(interaction: discord.Interaction): # <--- 올바르게 수정 완료!
+async def setup_verify_panel(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🎮 로블록스 계정 인증 안내",
         description="아래 **[로블록스 인증하기]** 버튼을 눌러 본인의 로블록스 **아이디**를 입력해 주세요.\n정상 확인되면 자동으로 **Verified** 역할과 프로필이 등록됩니다.",
