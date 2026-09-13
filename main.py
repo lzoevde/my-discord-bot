@@ -7,6 +7,20 @@ from discord import app_commands
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+async def get_roblox_thumbnail(user_id: int):
+    url = f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=420x420&format=Png&isCircular=false"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                results = data.get("data", [])
+                if results:
+                    # state가 Completed일 때만 정확한 imageUrl 반환
+                    item = results[0]
+                    if item.get("state") == "Completed":
+                        return item.get("imageUrl")
+    return None
+
 async def check_roblox_user(username: str):
     url = "https://users.roblox.com/v1/usernames/users"
     payload = {"usernames": [username], "excludeBannedUsers": True}
@@ -16,7 +30,11 @@ async def check_roblox_user(username: str):
                 data = await resp.json()
                 users = data.get("data", [])
                 if users:
-                    return users[0]
+                    user_info = users[0]
+                    user_id = user_info["id"]
+                    thumb_url = await get_roblox_thumbnail(user_id)
+                    user_info["avatarUrl"] = thumb_url
+                    return user_info
     return None
 
 class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
@@ -43,6 +61,7 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
         roblox_id = r_user["id"]
         roblox_display = r_user["displayName"]
         roblox_name = r_user["name"]
+        avatar_url = r_user.get("avatarUrl")
 
         role = discord.utils.get(guild.roles, name="Verified")
         if not role:
@@ -64,16 +83,18 @@ class VerificationModal(discord.ui.Modal, title="로블록스 계정 인증"):
         if target_channel:
             embed = discord.Embed(
                 title="✨ 로블록스 연동 플레이어 등록",
-                color=discord.Color.from_rgb(0, 162, 255) # 파란 계열 포인트 컬러
+                color=discord.Color.from_rgb(0, 162, 255)
             )
             embed.add_field(name="📌 디스코드 유저", value=f"{member.mention} (`{member}`)", inline=False)
             embed.add_field(name="🏷️ 로블록스 닉네임", value=f"**{roblox_display}**", inline=True)
             embed.add_field(name="🆔 로블록스 아이디", value=f"`@{roblox_name}`", inline=True)
             embed.add_field(name="🔢 로블록스 숫자 ID", value=f"`{roblox_id}`", inline=False)
             
-            # 아바타 렌즈 이미지 크게 설정
-            embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={roblox_id}&width=420&height=420&format=png")
-            embed.set_footer(text="Roblox Verification System", icon_url=guild.icon.url if guild.icon else None)
+            if avatar_url:
+                embed.set_thumbnail(url=avatar_url)
+                
+            icon_url = guild.icon.url if guild.icon else None
+            embed.set_footer(text="Roblox Verification System", icon_url=icon_url)
             embed.timestamp = discord.utils.utcnow()
             
             await target_channel.send(embed=embed)
@@ -124,5 +145,5 @@ if __name__ == "__main__":
     else:
         try:
             bot.run(TOKEN)
-        except Exception as e: # <--- 'e' 추가됨!
+        except Exception as e:
             print(f"❌ 봇 실행 중 오류 발생: {e}")
